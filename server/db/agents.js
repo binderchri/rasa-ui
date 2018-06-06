@@ -22,7 +22,7 @@ function uploadAgentFromFile(req, res, next) {
     var expressionObj = new Object();
     expressionObj.text = nlu_data_arr[i].text;
     expressionObj.paramArray = [];
-    var intentEntities = nlu_data_arr[i].entities;
+    var intentEntities = nlu_data_arr[i].entities || [];
     var entities_query_arr = [];
     for (j = 0; j < intentEntities.length; j++) {
       var entityObj = intentEntities[j];
@@ -40,12 +40,17 @@ function uploadAgentFromFile(req, res, next) {
     expressions_arr.push(expressionObj);
     intents_map.set(nlu_data_arr[i].intent, expressions_arr);
   }
-  console.log("Done Iterations. Inserting Entites now ... with json");
+  console.log("Done Iterations. Inserting Agent now ... with json");
 
   db.tx(function (t) {
+    // before inserting entities, the agent has to be inserted, as the entity table requires the agent_id to be inserted with each record
+    console.log("Agent inserted, inserting entities now.");
+
+    return t.one('insert into agents(agent_name) values($1) RETURNING agent_id', [req.body.agent_name])
+    .then(agent => {
     var entity_queries_arr = [];
     entities_set.forEach(function (entity) {
-      var entity_query = t.one('insert into entities(entity_name) values($1) RETURNING entity_id', entity)
+        var entity_query = t.one('insert into entities(agent_id, entity_name) values($1, $2) RETURNING entity_id', [agent.agent_id, entity])
         .then(function (return_entity) {
           console.log("Entity Inserted. Updating map for " + entity);
           entities_map.set(entity, return_entity.entity_id);
@@ -54,20 +59,20 @@ function uploadAgentFromFile(req, res, next) {
         });
       entity_queries_arr.push(entity_query);
     });
-    return t.batch(entity_queries_arr);
+      return [t.batch(entity_queries_arr), agent.agent_id];
+    })
   }).then(data => {
     // success
     // data = as returned from the transaction's callback
     console.log("All Entites Inserted. Proceeding with other data inserts");
     db.tx(function (t) {
       // t.ctx = transaction context object
-      return t.one('insert into agents(agent_name) values($1) RETURNING agent_id', [req.body.agent_name])
-        .then(agent => {
+      var agent_id = data[1];
           console.log("Agent Inserted");
           var intents_query_arr = [];
           intents_map.forEach(function (expressionsArray, key, map) {
             console.log("Inserting Intent " + key);
-            var intent_query = t.one('insert into intents(agent_id, intent_name) VALUES($1, $2) RETURNING intent_id', [agent.agent_id, key])
+        var intent_query = t.one('insert into intents(agent_id, intent_name) VALUES($1, $2) RETURNING intent_id', [agent_id, key])
               .then(intent => {
                 var expressions_query_arr = [];
                 expressionsArray.forEach(function (expressionObjVal) {
@@ -96,7 +101,6 @@ function uploadAgentFromFile(req, res, next) {
             intents_query_arr.push(intent_query);
           });
           return t.batch(intents_query_arr);
-        });
     }).then(data => {
       // success
       // data = as returned from the transaction's callback
