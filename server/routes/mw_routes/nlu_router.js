@@ -130,12 +130,14 @@ function finalizeCacheFlushToDbAndRespond(cacheKey, http_code, res, body, next) 
         //insert message and use that id to insert nlu_parse_log
         nlu_parse_cache.message_text= nlu_parse_cache.response_text;
         nlu_parse_cache.user_message_ind=false;
-        db.any('insert into messages(agent_id, user_id, user_name, message_text, user_message_ind)' +
-            ' values(${agent_id}, ${user_id},${user_name}, ${message_text}, ${message_rich}, ${user_message_ind}) RETURNING messages_id', nlu_parse_cache)
-          .then(function (messages_id) {
-            nlu_parse_cache.messages_id=messages_id;
-            db.none('INSERT INTO public.nlu_parse_log(intent_name, entity_data, messages_id,intent_confidence_pct, user_response_time_ms,nlu_response_time_ms) '+
-            +' values(${intent_name}, ${entity_data}, ${messages_id}, ${intent_confidence_pct},${user_response_time_ms},${nlu_response_time_ms})', nlu_parse_cache)
+        var querytext = 'insert into messages(agent_id, user_id, user_name, message_text, message_rich, user_message_ind)' +
+        ' values(${agent_id}, ${user_id},${user_name}, ${message_text}, ${message_rich}, ${user_message_ind}) RETURNING messages_id'
+        db.one(querytext, nlu_parse_cache)
+          .then(function (messages) {
+            nlu_parse_cache.messages_id=messages.messages_id;
+            var querytext = 'INSERT INTO public.nlu_parse_log(intent_name, entity_data, messages_id,intent_confidence_pct, user_response_time_ms,nlu_response_time_ms) ' +
+              ' values(${intent_name}, ${entity_data}, ${messages_id}, ${intent_confidence_pct},${user_response_time_ms},${nlu_response_time_ms})';
+            db.none(querytext, nlu_parse_cache)
               .then(function () {
                   console.log("Cache inserted into db. Removing it");
                   nluParseLogCache.del(cacheKey);
