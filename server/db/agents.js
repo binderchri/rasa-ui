@@ -48,17 +48,17 @@ function uploadAgentFromFile(req, res, next) {
 
     return t.one('insert into agents(agent_name) values($1) RETURNING agent_id', [req.body.agent_name])
     .then(agent => {
-    var entity_queries_arr = [];
-    entities_set.forEach(function (entity) {
+      var entity_queries_arr = [];
+      entities_set.forEach(function (entity) {
         var entity_query = t.one('insert into entities(agent_id, entity_name) values($1, $2) RETURNING entity_id', [agent.agent_id, entity])
-        .then(function (return_entity) {
-          console.log("Entity Inserted. Updating map for " + entity);
-          entities_map.set(entity, return_entity.entity_id);
-        }).catch(function (err) {
-          console.log("Error occured while inserting entities: " + err);
-        });
-      entity_queries_arr.push(entity_query);
-    });
+          .then(function (return_entity) {
+            console.log("Entity Inserted. Updating map for " + entity);
+            entities_map.set(entity, return_entity.entity_id);
+          }).catch(function (err) {
+            console.log("Error occured while inserting entities: " + err);
+          });
+        entity_queries_arr.push(entity_query);
+      });
       return [t.batch(entity_queries_arr), agent.agent_id];
     })
   }).then(data => {
@@ -68,39 +68,39 @@ function uploadAgentFromFile(req, res, next) {
     db.tx(function (t) {
       // t.ctx = transaction context object
       var agent_id = data[1];
-          console.log("Agent Inserted");
-          var intents_query_arr = [];
-          intents_map.forEach(function (expressionsArray, key, map) {
-            console.log("Inserting Intent " + key);
+      console.log("Agent Inserted");
+      var intents_query_arr = [];
+      intents_map.forEach(function (expressionsArray, key, map) {
+        console.log("Inserting Intent " + key);
         var intent_query = t.one('insert into intents(agent_id, intent_name) VALUES($1, $2) RETURNING intent_id', [agent_id, key])
-              .then(intent => {
-                var expressions_query_arr = [];
-                expressionsArray.forEach(function (expressionObjVal) {
-                  console.log("Inserting Expression " + expressionObjVal.text);
-                  var expressions_query = t.one('insert into expressions(intent_id, expression_text) values($1, $2) RETURNING expression_id', [intent.intent_id, expressionObjVal.text])
-                    .then(expression => {
-                      var parameters_query_arr = [];
-                      var p_arr = expressionObjVal.paramArray;
-                      for (var j = 0; j < p_arr.length; j++) {
-                        var paramObj = p_arr[j];
-                        if (paramObj.entity_id == -1) {
-                          //updated entityid
-                          paramObj.entity_id = entities_map.get(paramObj.entity);
-                        }
-                        console.log("Inserting Parameter for " + paramObj.parameter_value + " ,Mapping to Entity: " + paramObj.entity + " ,with key" + paramObj.entity_id);
-                        var params_query = t.none('insert into parameters (expression_id, parameter_end, parameter_start, parameter_value,entity_id) values($1,$2,$3,$4,$5)',
-                          [expression.expression_id, paramObj.end, paramObj.start, paramObj.parameter_value, paramObj.entity_id]);
-                        parameters_query_arr.push(params_query);
-                      }
-                      return t.batch(parameters_query_arr);
-                    });
-                  expressions_query_arr.push(expressions_query);
+          .then(intent => {
+            var expressions_query_arr = [];
+            expressionsArray.forEach(function (expressionObjVal) {
+              console.log("Inserting Expression " + expressionObjVal.text);
+              var expressions_query = t.one('insert into expressions(intent_id, expression_text) values($1, $2) RETURNING expression_id', [intent.intent_id, expressionObjVal.text])
+                .then(expression => {
+                  var parameters_query_arr = [];
+                  var p_arr = expressionObjVal.paramArray;
+                  for (var j = 0; j < p_arr.length; j++) {
+                    var paramObj = p_arr[j];
+                    if (paramObj.entity_id == -1) {
+                      //updated entityid
+                      paramObj.entity_id = entities_map.get(paramObj.entity);
+                    }
+                    console.log("Inserting Parameter for " + paramObj.parameter_value + " ,Mapping to Entity: " + paramObj.entity + " ,with key" + paramObj.entity_id);
+                    var params_query = t.none('insert into parameters (expression_id, parameter_end, parameter_start, parameter_value,entity_id) values($1,$2,$3,$4,$5)',
+                      [expression.expression_id, paramObj.end, paramObj.start, paramObj.parameter_value, paramObj.entity_id]);
+                    parameters_query_arr.push(params_query);
+                  }
+                  return t.batch(parameters_query_arr);
                 });
-                return t.batch(expressions_query_arr);
-              });
-            intents_query_arr.push(intent_query);
+              expressions_query_arr.push(expressions_query);
+            });
+            return t.batch(expressions_query_arr);
           });
-          return t.batch(intents_query_arr);
+        intents_query_arr.push(intent_query);
+      });
+      return t.batch(intents_query_arr);
     }).then(data => {
       // success
       // data = as returned from the transaction's callback
