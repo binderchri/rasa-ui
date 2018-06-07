@@ -1,0 +1,8 @@
+FROM postgres:latest
+
+## The docker image for the postgres server used by rasa-ui
+
+ADD resources/dbcreate.sql .
+
+# Scripts in /docker-entrypoint-initdb.d/ are executed on start of the container in alphabetical order
+ADD resources/dbinit.sh /docker-entrypoint-initdb.d/01_dbinit.sh

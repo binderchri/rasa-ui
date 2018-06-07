@@ -47,6 +47,7 @@ RUN sed -r 's/("postgresserver": )"[^"]*"(.*)/\1"\/var\/run\/postgresql"\2/' -i 
 ENV rasanluendpoint=http://localhost:5000
 ENV rasacoreendpoint=http://localhost:5005
 
+
 EXPOSE 5001
 
 ENTRYPOINT bash -c 'hostname -I; service postgresql start && su rasaui -c "npm start"'
