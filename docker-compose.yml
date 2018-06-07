@@ -5,9 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile_slim
 
-    # only if access from the host is needed (e.g. debugging):
-    # ports:
-    #   - "5001:5001"
+    ports:
+      - "5001:5001"
     links:
       - db:db
       - rasanlu:rasanlu
@@ -37,8 +36,9 @@ services:
       - /home/christian/rasa/projects:/app/projects
       - /home/christian/rasa/configs/spacy_sklearn.en.yml:/app/myconfig.yml 
 
-    ports:
-      - "5000:5000"
+    # only if access from the host is needed (e.g. debugging):
+    # ports:
+    #   - "5000:5000"
 
     command: run python -m rasa_nlu.server --path /app/projects --config /app/myconfig.yml
 
