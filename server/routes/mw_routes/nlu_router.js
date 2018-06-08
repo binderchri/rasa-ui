@@ -103,7 +103,7 @@ function parseRequest(req, res, next, agentObj) {
     try {
       console.log("rasa_response:+++ " + body);
       updateCacheWithRasaNluResponse(JSON.parse(body), cache_key);
-      updateAndSendRasaResponse(req, cache_key, JSON.parse(body), modelName, projectName, res);
+      updateAndSendRasaResponse(req, cache_key, JSON.parse(body), modelName, projectName, res, next);
     } catch (err) {
       console.log(err);
       sendOutput(500, res, '{"error" : ' + err + '}');
@@ -114,7 +114,7 @@ function parseRequest(req, res, next, agentObj) {
 // ----------------------------------------------------------
 // Utility functions for middleware
 // ----------------------------------------------------------
-function finalizeCacheFlushToDbAndRespond(cacheKey, http_code, res, body) {
+function finalizeCacheFlushToDbAndRespond(cacheKey, http_code, res, body, next) {
   nluParseLogCache.get(cacheKey, function( err, nlu_parse_cache ){
     if( !err ){
       if(nlu_parse_cache == undefined){
@@ -130,12 +130,14 @@ function finalizeCacheFlushToDbAndRespond(cacheKey, http_code, res, body) {
         //insert message and use that id to insert nlu_parse_log
         nlu_parse_cache.message_text= nlu_parse_cache.response_text;
         nlu_parse_cache.user_message_ind=false;
-        db.any('insert into messages(agent_id, user_id, user_name, message_text, user_message_ind)' +
-            ' values(${agent_id}, ${user_id},${user_name}, ${message_text}, ${message_rich}, ${user_message_ind}) RETURNING messages_id', nlu_parse_cache)
-          .then(function (messages_id) {
-            nlu_parse_cache.messages_id=messages_id;
-            db.none('INSERT INTO public.nlu_parse_log(intent_name, entity_data, messages_id,intent_confidence_pct, user_response_time_ms,nlu_response_time_ms) '+
-            +' values(${intent_name}, ${entity_data}, ${messages_id}, ${intent_confidence_pct},${user_response_time_ms},${nlu_response_time_ms})', nlu_parse_cache)
+        var querytext = 'insert into messages(agent_id, user_id, user_name, message_text, message_rich, user_message_ind)' +
+        ' values(${agent_id}, ${user_id},${user_name}, ${message_text}, ${message_rich}, ${user_message_ind}) RETURNING messages_id'
+        db.one(querytext, nlu_parse_cache)
+          .then(function (messages) {
+            nlu_parse_cache.messages_id=messages.messages_id;
+            var querytext = 'INSERT INTO public.nlu_parse_log(intent_name, entity_data, messages_id,intent_confidence_pct, user_response_time_ms,nlu_response_time_ms) ' +
+              ' values(${intent_name}, ${entity_data}, ${messages_id}, ${intent_confidence_pct},${user_response_time_ms},${nlu_response_time_ms})';
+            db.none(querytext, nlu_parse_cache)
               .then(function () {
                   console.log("Cache inserted into db. Removing it");
                   nluParseLogCache.del(cacheKey);
@@ -249,9 +251,9 @@ function logRequest(req, type, data) {
   }
 }
 
-function updateAndSendRasaResponse(req, cacheKey, rasa_response, modelName, projectName, res) {
+function updateAndSendRasaResponse(req, cacheKey, rasa_response, modelName, projectName, res, next) {
   if (rasa_response.intent == undefined) {
-    finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+    finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
   } else {
     db.any(
     'select agents.endpoint_enabled as agent_endpoint, agents.endpoint_url, agents.basic_auth_username,agents.basic_auth_password, '+
@@ -277,7 +279,7 @@ function updateAndSendRasaResponse(req, cacheKey, rasa_response, modelName, proj
               //Got error from webhook,log and and send original rasa nlu response
               console.log(error);
               rasa_response.response_text = "Configured Webhook threw an error. Check with the service provider.";
-              finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+              finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
               return;
             }
             try {
@@ -293,15 +295,15 @@ function updateAndSendRasaResponse(req, cacheKey, rasa_response, modelName, proj
                   rasa_response.response_text = JSON.parse(body).displayText;
                   rasa_response.response_rich=JSON.parse(body).dataToClient;
                   console.log("Sending Rasa NLU Response + Webhook response");
-                  finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+                  finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
                 }else{
                   console.log("Unknown response from webhook. Respond back with Rasa NLU only");
-                  finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+                  finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
                 }
               } catch (err) {
                 console.log("Error from Webhook. Respond back with Rasa NLU only");
                 console.log(err);
-                finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+                finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
               }
           });
         }else{
@@ -311,21 +313,21 @@ function updateAndSendRasaResponse(req, cacheKey, rasa_response, modelName, proj
             if (data.length > 0) {
               rasa_response.response_text =data[0].response_text;
               console.log("Sending Rasa NLU Response + Static response configured");
-              finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+              finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
             } else {
                 console.log("No Static response configured. Respond back with Rasa NLU only");
-                finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+                finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
             }
           })
           .catch(function (err) {
             console.log("Error occurred. Respond back with Rasa NLU only");
             console.log(err);
-            finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+            finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
           });
         }
       }else{
         console.log("No intent Data found. Respond back with Rasa NLU only");
-        finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response);
+        finalizeCacheFlushToDbAndRespond(cacheKey,200, res, rasa_response, next);
       }
     })
   }

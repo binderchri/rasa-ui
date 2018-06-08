@@ -1,0 +1,46 @@
+version: '3'
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile_slim
+
+    ports:
+      - "5001:5001"
+    links:
+      - db:db
+      - rasanlu:rasanlu
+
+    environment: 
+      - rasanluendpoint=http://rasanlu:5000
+      - postgresserver=postgres://rasaui:rasaui@db:5432/rasaui
+      
+  db:
+    build:
+      context: .
+      dockerfile: Dockerfile_postgres
+
+    volumes:
+      # view the volume's contents with 'docker volume inspect rasaui_pgdata'
+      - pgdata:/var/lib/postgresql/data
+
+    # only if access from the host is needed (e.g. debugging)
+    # ports:
+    #   - "5432:5432"
+  rasanlu:
+    image: rasa/rasa_nlu:latest
+
+    volumes: 
+      - /home/christian/development/scratch/docker-rasa-nlu/vol/data:/app/data
+      - /home/christian/development/scratch/docker-rasa-nlu/vol/logs:/app/logs
+      - /home/christian/rasa/projects:/app/projects
+      - /home/christian/rasa/configs/spacy_sklearn.en.yml:/app/myconfig.yml 
+
+    # only if access from the host is needed (e.g. debugging):
+    # ports:
+    #   - "5000:5000"
+
+    command: run python -m rasa_nlu.server --path /app/projects --config /app/myconfig.yml
+
+volumes:
+  pgdata:

@@ -14,10 +14,10 @@
     "node-cache": "^4.1.1",
     "pg-promise": "^5.9.5",
     "request": "^2.81.0",
-    "angular": "1.6.4",
+    "angular": "^1.6.4",
     "angular-chart.js": "^1.1.1",
-    "angular-resource": "1.6.4",
-    "angular-route": "1.6.4",
+    "angular-resource": "^1.6.4",
+    "angular-route": "^1.6.4",
     "angular-sanitize": "^1.6.9",
     "angular-socket-io": "^0.7.0",
     "angular-utils-pagination": "^0.11.1",
@@ -44,11 +44,12 @@
     "nlusecuritytoken": "",
     "cacheagents": false,
     "jwtsecret": "th1s1sn0t0nlyths3cr3tbutth3m0st1mp0rtAntp13c30f1nf0rmAt10nf0rth1sAppl1cAt10n",
-    "postgresserver": "postgres://postgres:rasaui@localhost:5432/rasaui"
+    "postgresserver": "postgres://rasaui:rasaui@localhost:5432/rasaui"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "debug": "node --inspect server/server.js"
   },
   "author": "Paul Aschmann",
   "url": "https://github.com/paschmann/rasa-ui",
