@@ -31,10 +31,10 @@ services:
     image: rasa/rasa_nlu:latest
 
     volumes: 
-      - /home/christian/development/scratch/docker-rasa-nlu/vol/data:/app/data
-      - /home/christian/development/scratch/docker-rasa-nlu/vol/logs:/app/logs
-      - /home/christian/rasa/projects:/app/projects
-      - /home/christian/rasa/configs/spacy_sklearn.en.yml:/app/myconfig.yml 
+      - rasadata:/app/data
+      - rasalogs:/app/logs
+      - ${RASA_PROJECTS}:/app/projects
+      - ${RASA_CONFIG}:/app/myconfig.yml 
 
     # only if access from the host is needed (e.g. debugging):
     # ports:
@@ -44,3 +44,5 @@ services:
 
 volumes:
   pgdata:
+  rasadata:
+  rasalogs:
